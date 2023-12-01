@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<head>
+    <title>Image Gallery</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .image-container {
+            text-align: center;
+        }
+
+        .image-container div {
+            display: inline-block;
+            margin: 20px;
+            text-align: center;
+        }
+
+        img {
+            display: block;
+            margin: 10px auto;
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Image Gallery</h1>
+    <section>
+        <div class="image-container">
+            {% for title, image in data.items() %}
+                <div>
+                    <h2>{{ title }}</h2>
+                    <img src="data:image/png;base64,{{ image }}" alt="{{ title }}">
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+</body>
+</html>
