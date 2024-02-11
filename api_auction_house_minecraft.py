@@ -10,8 +10,11 @@ import matplotlib.pyplot as plt
 import json as js
 matplotlib.use('Agg')
 
+#libraries that I use. Matplotlib uses Agg as the backend to write file. Can't render a window with it though.
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.executors.pool import ThreadPoolExecutor, ProcessPoolExecutor
+#these schedulers are to control when to update the graph.
 
 
 app=Flask(__name__)
@@ -28,7 +31,16 @@ sched = BackgroundScheduler(timezone='Asia/Seoul', executors=executors)
 
 class API_object:
     def __init__(self, dict_of_candle_data={}):
-        # self.discord_server_id=server_id
+        '''
+        Let me explain what each of these are
+        df. I have no idea what it is honestly. Will delete this.
+        send_image. I honestly don't quite remember what this was. But back when this code was in its sort of "alpha" version, this was the variable that controlled whether to update the charts or not. Will delete this.
+        dict_of_candle_data. This is literally all the data stored for each item. Data is added to this through a variable known as "temporary_df", which I explain later if you keep reading.
+        image_array_list. This is where all the images are kept. This is gonna be a bit tough to explain. Basically, the images are kept here. When someone makes a get request to aquire the images for a certain minecraft server, each image_data is returned in this. The image_data consists of two things: (base64_image), (title).
+        list_of_trades. This is where all the new trades that have been coming in from the minecraft server is being kept. Keyword, NEW trades. An iterator loops through these and a temporary df is made that takes the open, high, low, close of each dataframe. The open is the first row's value in the dataframe. The high is the maximum the value go tin the dataframe. The low is teh lowest the value got in the dataframe. And the close is the value the dataframe ended at. Btw for some reason I loop through the dataframe itself, although I don't need to. I will fix this and restructure the code to make it more efficient.
+        update_charts. This is what the scheduler controls. If this is turned on, the next time a request is made to add something to the graph, it will update the actual graph itself.
+        return_dictionary. This is returned to a html file that uses jinja to process the dictionary and actually show the images. dictionary looks like: {'title_of_image': 'base64_data'}. That simple.
+        '''
         self.df=pd.DataFrame()
         self.send_image=False
         self.dict_of_candle_data=dict_of_candle_data
@@ -36,20 +48,33 @@ class API_object:
         self.list_of_trades=[]
         self.update_charts=False
         self.return_dictionary={}
-        # self.server_id=server_id
-        # app.add_url_rule(f'/{str(self.server_id)}', server_id, self.api_function, methods=['POST', 'GET'])
+
 
 
     def api_function(self, method_type, req_Json):
+        '''
+        this is a huge function that depending on the method, it will do one part or another. I'll eventually organize this to make it two different functions to be more organized.
+        lets begin with the explanations
+        '''
+
+        
         if method_type=='POST':
             # req_Json=request.json
+
+            '''
+            the method_type == 'POST' checks whether or not a post request was sent to make sure it's doing the right function.
+
+            The code underneath this until if len(self.list_of_trades)!=0: is about processing the json data sent by the server. (Post requests are always sent by server).
+            Ngl ths code is pretty self explanatory, so I'll move on. HOWEVER, there is one thing I should explain.
+            1. I split the item name into two parts because each item name is actually sent by its id. an example id is minecraft:dirt
+            '''
             starting_price=req_Json['starting_price']
             selling_price=req_Json['selling_price']
             item_name=req_Json['item_name']
             item_name=(item_name.split(':'))[1] #this is due to a minecraft id being minecraft:{item}
 
-            if item_name=='name_tag':
-                return jsonify(f'item {item_name} will not be turned into chart')
+            # if item_name=='name_tag': #this was here because before ids we used the names of the items, so theoretically someone could clog the charts with a bunch of random names of random items.
+            #     return jsonify(f'item {item_name} will not be turned into chart')
 
             max_durability=req_Json['max_durability']
             lost_durability=req_Json['lost_durability']
@@ -64,6 +89,16 @@ class API_object:
             self.channel_id=req_Json['channel_id']
 
             sell_price=selling_price*(math.pow(durability_stat, -1))
+
+
+            '''
+            this small thing with if len(self.list_of_trades)!=0
+
+            This first checks to make sure the the length of list_of_trades isn't 0. If it is 0, it adds the first dataframe to list_of_trades. If it isn't zero, it continues to the next part.
+            Next it iterates over each dataframe in list_of_trades, which is something that holds all the new auction house data that has come in before the graph is to be updated.
+            If the item_name is inside one of the dataframes, it adds the value that the current newest auction house value got of the data to it respective dataframe.
+            If the item_name isn't inside one of the dataframes, it does the exact same thing if self.list_ot_trades == 0. It creates a the first dataframe for that specific item in list_of_trades.
+            '''
 
             if len(self.list_of_trades)!=0:
                 for i, df in enumerate(self.list_of_trades):
@@ -85,6 +120,10 @@ class API_object:
 
         elif method_type=='GET':
 
+            '''
+            this is executed if someone sends a get request, meaning they go to view the website to see the charts.
+            '''
+
             #basically if update charts is false, meaning the time period hasn't passed yet to add a new candle, it will just return the same data/images
             if self.update_charts==False:
                 return self.return_dictionary
@@ -93,6 +132,22 @@ class API_object:
             if len(self.list_of_trades)==0: #this was causing an error because if it returned what it returned, it didn't return data and that screwed it up. Therefore I commented return jsonify("nothing to return") and put in return self.return_dictionary
                 # return jsonify("nothing to return")
                 return self.return_dictionary
+
+
+            '''
+            this code is executed if the two above if statements are not executed. If you want to see what the if statements do, read the comments next to them.
+            Basically, this code first goes through each dataframe in list_of_trades. Each dataframe contains all the data sent by the server for each item. The data is a list of prices the items were sold at.
+            It then iterations over the columns of the dataframe.
+            Now, although I did iterate (enumerate) over this, I didn't quite need to because technically, there should only be one column for each dataframe, so i isn't necessary. HOWEVER, column is, which you'll find out later. Actually now that I think about it, there is another way I could do without necessarily iterating of the i and columns of the dataframe. But I'll do that later. What I'm thinking is to just grab the columsn by doing df.columns[0]. To access the items in the dict_of_candle_data dictionary.
+            temporary_df is made from the open, high, low, close. These are explained previously.
+            After creating these, it creates a arbitrary index for temporary_df
+            It then tries checking whether there is a column for that specific item in the dict_of_candle_data by doing .get. .get returns a None if it isn't found. If it is found, it returns the dataframe.
+            Next is self explanatory. If you don't know what concat is, it basically concatenates (sticks) the two dataframes together.
+            Now, the next block of code is yes, I know, horrifying. It is terrible, evil, I hate it myself as well. but, it works, so I'm not touching it. Basically what it does is reset the index to accomodate for the new values. That's it. If you're wondering why we need a arbitrary index in the first place, it's because the mplfinance library requires it to make the base64_image.
+            After that, the code iterates over dict_of_candle_data and makes the charts for each of the items's ohlc data. It turns the charts into base64 images, and puts each image in image_array_list.
+            It then puts the images into a return_dictionary, which will later be fed into html/jinja where each of the images will be displayed with their titles above their respective images.
+            Btw remember, the rest of these steps is only done if update_charts = True and there is actually new trades in list_of_trades.
+            '''
             
             for df in self.list_of_trades:
                 for i, column in enumerate(df):
@@ -169,9 +224,6 @@ class API_object:
 
 
     
-
-
-
 
 api_object_dictionary={}
 
