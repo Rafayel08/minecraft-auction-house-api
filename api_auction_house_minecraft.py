@@ -225,6 +225,30 @@ class API_object:
 
     
 
+
+'''
+these are the final parts
+the api_object_dictionary is a dictionary that houses all the api objects. Basically all the data for each server.
+the tell_api_objects_they_need_to_update_the_charts is literally does what it is in its name.
+This function is scheduled every 900 seconds, which is equal to 15 minutes.
+
+Alright, here comes the actual api setup itself.
+So, the route to the app is setup, where the user can enter any minecraft_server_name and it will return something based on whether the api object exists for it or not.
+This is done with the director function, which works like this
+It takes in the minecraft_server_name the user or server entered in the url
+It then checks if it a POST or GET request. A POST request would mean a minecraft server is sending it data, whilst a GET request would mean a user is trying to go to the website to see the graphs generated.
+If it is a POST request (minecraft server sending data), it takes the Json sent, and checks whether or not a api_object for that specific server exists or not.
+If it does exist, it will do the api_function with method_type POST for that api_object.
+If it doesn't exist, it will make a new api_object and do the api_function with method_type POST for that new object.
+If if it a GET request (user going to url), it will
+1. Make a get_data dictionary to be a temporary distraction (placeholder) for req_Json parameter
+2. Check if the minecraft_server is in the api_object_dictionary
+If it is in the dictionary, it will get the json (dictionary) returned by the api_function with method_type GET
+then it will checks if the dictionary returned it a str or not, which happened for some reason but I don't think happens anymore (will check this and probably remove it)
+Afterwards it will go through one more check to see if there are actually any images in the dictionary, which deals with a bug that made the web that is hosted have a stroke
+If any of thse steps don't happen to workout, the code will default to sending a no_data.html file which is the placeholder for when there isn't any data/charts to put on for the user to see, or there is a error.
+'''
+
 api_object_dictionary={}
 
 def tell_api_objects_they_need_to_update_the_charts():
@@ -232,7 +256,7 @@ def tell_api_objects_they_need_to_update_the_charts():
         api_object_dictionary[col].update_charts=True
 
 #adds job to scheduler
-sched.add_job(tell_api_objects_they_need_to_update_the_charts, 'interval', seconds=15)
+sched.add_job(tell_api_objects_they_need_to_update_the_charts, 'interval', seconds=900)
 
 
 #set up flask api that will see if server id exists in dictionary or not and based on that create new api_object
@@ -277,7 +301,8 @@ def director(minecraft_server_name):
             return render_template("no_data.html")
         
     else:
-        return jsonify({'error': 'Invalid request'})
+        return render_template("no_data.html")
+        # return jsonify({'error': 'Invalid request'})
 
     # print(api_object_dictionary)
 
