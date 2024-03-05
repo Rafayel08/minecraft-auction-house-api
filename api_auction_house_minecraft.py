@@ -185,8 +185,6 @@ class API_object:
             for i, column in enumerate(self.dict_of_candle_data):
                 fig,ax=mpf.plot(self.dict_of_candle_data[column][['Open', 'High', 'Low', 'Close', 'Volume']], type='candle', style='yahoo', returnfig=True, title=str(column), volume=True)
 
-                # fig.savefig('/Users/rafayelsargsyan/Documents/PythonPrograms/auction_house/ez.png')
-
                 buf = io.BytesIO()
                 fig.savefig(buf, format='png')
                 buf.seek(0)
